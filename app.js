@@ -5,8 +5,8 @@
 const PROC_W = 320;
 let PROC_H = 180;
 
-// Heuristic mosquito confidence must reach this before a snapshot is taken.
-const CONF_SNAPSHOT = 0.99;
+// Heuristic mosquito confidence must reach the user-set threshold before a
+// snapshot is taken (see the "Snapshot at" control).
 const SNAPSHOT_COOLDOWN_MS = 4000;
 
 const video = document.getElementById('video');
@@ -26,6 +26,8 @@ const ui = {
   divergence: document.getElementById('divergence'),
   minSize: document.getElementById('minSize'),
   maxSize: document.getElementById('maxSize'),
+  confThresh: document.getElementById('confThresh'),
+  confThreshVal: document.getElementById('confThreshVal'),
   demoBtn: document.getElementById('demoBtn'),
   debugBtn: document.getElementById('debugBtn'),
   resetBtn: document.getElementById('resetBtn'),
@@ -37,6 +39,10 @@ const ui = {
   gallery: document.getElementById('gallery'),
   clearShots: document.getElementById('clearShots'),
   cameraBtn: document.getElementById('cameraBtn'),
+  intro: document.getElementById('intro'),
+  introCameraBtn: document.getElementById('introCameraBtn'),
+  introDemoBtn: document.getElementById('introDemoBtn'),
+  introNote: document.getElementById('introNote'),
   warning: document.getElementById('warning'),
   controls: document.getElementById('controls'),
   controlsToggle: document.getElementById('controlsToggle'),
@@ -88,7 +94,7 @@ const demo = { on: false, x: 80, y: 60, vx: 25, vy: 12, t: 0 };
 
 // Self-contained "simulated room" shown on load (no camera). A bug flies around a
 // drawn room while the virtual laser tracks it — a preview of what the tool does.
-const sim = { active: true, x: 0, y: 0, vx: 60, vy: 30, t: 0, tx: 0, ty: 0, started: false };
+const sim = { active: false, x: 0, y: 0, vx: 60, vy: 30, t: 0, tx: 0, ty: 0, started: false };
 
 const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -383,7 +389,8 @@ function updateTrack(assoc, acquire, now, demoBlob) {
     track.conf *= 0.95;
   }
 
-  if (!manual && track.state === 'locked' && track.conf >= CONF_SNAPSHOT
+  const confThresh = Number(ui.confThresh.value) / 100;
+  if (!manual && track.state === 'locked' && track.conf >= confThresh
       && !track.snapshotTaken && now - lastSnapshotT > SNAPSHOT_COOLDOWN_MS) {
     track.snapshotTaken = true;
     lastSnapshotT = now;
@@ -830,6 +837,16 @@ if (matchMedia('(max-width: 760px)').matches) {
   ui.controlsToggle.setAttribute('aria-expanded', 'false');
 }
 
+// Reserve page space equal to the fixed dock's real height so the disclaimer
+// (and anything else at the bottom) is never hidden behind it.
+const mainEl = document.querySelector('main');
+function syncDockSpacer() {
+  mainEl.style.paddingBottom = `${ui.dock.offsetHeight + 16}px`;
+}
+new ResizeObserver(syncDockSpacer).observe(ui.dock);
+addEventListener('resize', syncDockSpacer);
+syncDockSpacer();
+
 ui.camera.addEventListener('change', () => startCamera(ui.camera.value).catch(showError));
 
 ui.beamStyle.addEventListener('change', () => {
@@ -851,6 +868,11 @@ ui.debugBtn.addEventListener('click', () => {
 
 ui.resetBtn.addEventListener('click', () => { bg = null; resetTrack(); });
 
+ui.confThresh.addEventListener('input', () => {
+  ui.confThreshVal.textContent = `${ui.confThresh.value}%`;
+  track.snapshotTaken = false; // let the new threshold re-arm the current lock
+});
+
 ui.clearShots.addEventListener('click', () => {
   ui.gallery.innerHTML = '';
   ui.gallerySection.hidden = true;
@@ -858,6 +880,7 @@ ui.clearShots.addEventListener('click', () => {
 
 video.addEventListener('playing', () => {
   sim.active = false; // real frames flowing — leave the simulated room
+  ui.intro.hidden = true;
   startLoop();
 });
 
@@ -865,11 +888,28 @@ function showError(err) {
   console.error(err);
   ui.status.textContent = `camera error: ${err.name || err.message}`;
   ui.status.className = 'status coast';
-  // fall back to the simulated demo so the page is never blank
-  sim.active = true;
-  ui.cameraBtn.disabled = false;
-  ui.cameraBtn.classList.remove('live');
-  ui.cameraBtn.textContent = '📷 Use my camera';
+  // bring back the intro so the user can retry or watch the demo instead
+  sim.active = false;
+  ui.intro.hidden = false;
+  ui.introNote.textContent = "Couldn't access the camera — check permissions and try again, or watch the demo.";
+  ui.introNote.classList.add('error');
+  setCameraBtn('idle');
+}
+
+function setCameraBtn(stateName) {
+  if (stateName === 'starting') {
+    ui.cameraBtn.disabled = true;
+    ui.cameraBtn.classList.remove('live');
+    ui.cameraBtn.textContent = 'Starting camera…';
+  } else if (stateName === 'live') {
+    ui.cameraBtn.disabled = false;
+    ui.cameraBtn.classList.add('live');
+    ui.cameraBtn.textContent = '📷 Camera on';
+  } else { // idle
+    ui.cameraBtn.disabled = false;
+    ui.cameraBtn.classList.remove('live');
+    ui.cameraBtn.textContent = '📷 Use my camera';
+  }
 }
 
 let loopRunning = false;
@@ -880,22 +920,33 @@ function startLoop() {
 }
 
 async function boot(deviceId) {
-  ui.cameraBtn.disabled = true;
-  ui.cameraBtn.textContent = 'Starting camera…';
+  setCameraBtn('starting');
+  ui.introCameraBtn.disabled = true;
   ui.status.textContent = 'starting…';
   ui.status.className = 'status search';
   try {
     await startCamera(deviceId);
     sim.active = false;
-    ui.cameraBtn.textContent = '📷 Camera on';
-    ui.cameraBtn.classList.add('live');
-    ui.cameraBtn.disabled = false;
+    ui.intro.hidden = true;
+    setCameraBtn('live');
   } catch (err) {
     showError(err);
+  } finally {
+    ui.introCameraBtn.disabled = false;
   }
 }
 
-ui.cameraBtn.addEventListener('click', () => boot(ui.camera.value || undefined));
+function startDemo() {
+  sim.active = true;
+  sim.started = false; // re-center the bug for the new run
+  ui.intro.hidden = true;
+  startLoop();
+}
 
-// Start in the simulated-room demo; the user opts into their camera with the button.
+ui.cameraBtn.addEventListener('click', () => boot(ui.camera.value || undefined));
+ui.introCameraBtn.addEventListener('click', () => boot(ui.camera.value || undefined));
+ui.introDemoBtn.addEventListener('click', startDemo);
+
+// Render loop runs from the start; it shows the camera, the demo, or nothing
+// behind the intro overlay until the user chooses.
 startLoop();

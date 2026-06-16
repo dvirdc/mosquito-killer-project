@@ -40,7 +40,7 @@
     </div>
   </div>
   <div class="hud">
-    <span id="status" class="status search">demo</span>
+    <span id="status" class="status search">ready</span>
     <span id="conf" class="pill"></span>
     <span id="fps" class="pill"></span>
     <span id="resInfo" class="pill"></span>
@@ -56,6 +56,16 @@
       <video id="video" playsinline muted></video>
       <canvas id="overlay"></canvas>
       <canvas id="debug"></canvas>
+      <div id="intro" class="intro">
+        <span class="intro-logo" aria-hidden="true">🦟</span>
+        <h2 class="intro-title">PewPewBug</h2>
+        <p class="intro-text">Computer vision spots a mosquito on your camera and aims a (virtual) laser right at it — so you can find it and swat it.</p>
+        <div class="intro-actions">
+          <button id="introCameraBtn" class="btn-primary" type="button">📷 Use my camera</button>
+          <button id="introDemoBtn" class="btn-ghost" type="button">▶ Watch the demo</button>
+        </div>
+        <p id="introNote" class="intro-note">Runs entirely on your device — no video is uploaded. Just for fun.</p>
+      </div>
     </div>
   </div>
 
@@ -94,6 +104,10 @@
     </label>
     <label>Max size
       <input type="range" id="maxSize" min="50" max="3000" value="500" step="10">
+    </label>
+    <label>Snapshot at
+      <input type="range" id="confThresh" min="50" max="99" value="99">
+      <output id="confThreshVal">99%</output>
     </label>
     <div class="btn-row">
       <button id="demoBtn" type="button">Demo bug</button>
