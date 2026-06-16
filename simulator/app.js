@@ -36,7 +36,31 @@ const ui = {
   gallerySection: document.getElementById('gallerySection'),
   gallery: document.getElementById('gallery'),
   clearShots: document.getElementById('clearShots'),
+  warning: document.getElementById('warning'),
+  controls: document.getElementById('controls'),
+  controlsToggle: document.getElementById('controlsToggle'),
+  clearTarget: document.getElementById('clearTarget'),
 };
+
+// Camera-quality warnings. lowRes is decided once a camera starts; lowFps is
+// measured continuously. The banner text is only rewritten when it changes.
+const warn = { lowRes: false, lowFps: false };
+let lastWarnText = '';
+
+function refreshWarning() {
+  const msgs = [];
+  if (warn.lowRes) msgs.push('Low-resolution camera detected — detection is limited and small bugs may be missed.');
+  if (warn.lowFps) msgs.push('Low frame rate on this device — fast-moving bugs may be missed.');
+  const text = msgs.join(' ');
+  if (text === lastWarnText) return;
+  lastWarnText = text;
+  if (text) {
+    ui.warning.textContent = '⚠ ' + text;
+    ui.warning.hidden = false;
+  } else {
+    ui.warning.hidden = true;
+  }
+}
 
 const BEAM_PRESETS = {
   laser:      { color: [57, 255, 110],  originW: 3,  divDefault: 12, core: true },
@@ -60,6 +84,8 @@ const track = {
 
 const demo = { on: false, x: 80, y: 60, vx: 25, vy: 12, t: 0 };
 
+const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
+
 // ---------- camera ----------
 
 async function startCamera(deviceId) {
@@ -69,7 +95,7 @@ async function startCamera(deviceId) {
     height: { ideal: 1080 },
   };
   if (deviceId) videoConstraints.deviceId = { exact: deviceId };
-  else videoConstraints.facingMode = 'user';
+  else videoConstraints.facingMode = isTouch ? { ideal: 'environment' } : 'user';
 
   stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraints });
   video.srcObject = stream;
@@ -82,7 +108,11 @@ async function startCamera(deviceId) {
   debugCv.height = PROC_H;
   bg = null; // rebuild background model
   resetTrack();
-  ui.resInfo.textContent = `${video.videoWidth}×${video.videoHeight}`;
+  const vw = video.videoWidth, vh = video.videoHeight;
+  ui.resInfo.textContent = `${vw}×${vh}`;
+  // A poor camera (or a heavily downscaled mobile stream) hurts detection — flag it.
+  warn.lowRes = (vw > 0 && vw < 640) || (vh > 0 && vh < 480);
+  refreshWarning();
   await listCameras(deviceId);
 }
 
@@ -597,6 +627,7 @@ function render(now) {
 
 let lastT = performance.now();
 let fpsEma = 0;
+let frameCount = 0;
 
 function tick(now) {
   const dt = Math.min(0.1, (now - lastT) / 1000);
@@ -607,20 +638,43 @@ function tick(now) {
   }
   if (dt > 0) fpsEma = fpsEma ? fpsEma * 0.92 + (1 / dt) * 0.08 : 1 / dt;
   ui.fps.textContent = `${fpsEma.toFixed(0)} fps`;
+
+  // After a short warm-up, flag a sustained low frame rate (hysteresis avoids flicker).
+  if (++frameCount > 120) {
+    if (fpsEma < 12 && !warn.lowFps) { warn.lowFps = true; refreshWarning(); }
+    else if (fpsEma > 18 && warn.lowFps) { warn.lowFps = false; refreshWarning(); }
+  }
   requestAnimationFrame(tick);
 }
 
 // ---------- events ----------
 
-overlay.addEventListener('click', (e) => {
+function setManualFromEvent(clientX, clientY) {
   const rect = overlay.getBoundingClientRect();
   manual = {
-    x: (e.clientX - rect.left) / rect.width * PROC_W,
-    y: (e.clientY - rect.top) / rect.height * PROC_H,
+    x: (clientX - rect.left) / rect.width * PROC_W,
+    y: (clientY - rect.top) / rect.height * PROC_H,
   };
-});
+}
 
+overlay.addEventListener('click', (e) => setManualFromEvent(e.clientX, e.clientY));
 overlay.addEventListener('dblclick', () => { manual = null; });
+
+// Touch: a tap sets a manual target without waiting on the 300ms click delay.
+overlay.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    setManualFromEvent(t.clientX, t.clientY);
+    e.preventDefault(); // suppress the synthetic click / page scroll
+  }
+}, { passive: false });
+
+ui.clearTarget.addEventListener('click', () => { manual = null; });
+
+ui.controlsToggle.addEventListener('click', () => {
+  const open = ui.controls.classList.toggle('open');
+  ui.controlsToggle.setAttribute('aria-expanded', String(open));
+});
 
 ui.camera.addEventListener('change', () => startCamera(ui.camera.value).catch(showError));
 
@@ -648,10 +702,30 @@ ui.clearShots.addEventListener('click', () => {
   ui.gallerySection.hidden = true;
 });
 
+video.addEventListener('playing', startLoop);
+
 function showError(err) {
+  console.error(err);
   ui.status.textContent = `camera error: ${err.name || err.message}`;
   ui.status.className = 'status coast';
-  console.error(err);
 }
 
-startCamera().then(() => requestAnimationFrame(tick)).catch(showError);
+let loopRunning = false;
+function startLoop() {
+  if (loopRunning) return;
+  loopRunning = true;
+  requestAnimationFrame(tick);
+}
+
+async function boot(deviceId) {
+  ui.status.textContent = 'starting…';
+  ui.status.className = 'status search';
+  try {
+    await startCamera(deviceId);
+  } catch (err) {
+    showError(err);
+  }
+}
+
+boot();
+startLoop(); // render loop runs regardless; it self-gates on video readiness

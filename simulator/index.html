@@ -2,75 +2,105 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Mosquito pointer simulator</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PewPewBug — for-fun simulator</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <h1>Mosquito pointer simulator</h1>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">🦟</span>
+    <div class="brand-text">
+      <h1>PewPewBug</h1>
+      <p class="tagline">computer-vision bug spotter · simulator</p>
+    </div>
+  </div>
   <div class="hud">
     <span id="status" class="status search">starting…</span>
-    <span id="conf"></span>
-    <span id="fps"></span>
-    <span id="resInfo"></span>
+    <span id="conf" class="pill"></span>
+    <span id="fps" class="pill"></span>
+    <span id="resInfo" class="pill"></span>
   </div>
 </header>
 
-<div class="controls">
-  <label>Camera
-    <select id="camera"></select>
-  </label>
-  <label>Beam style
-    <select id="beamStyle">
-      <option value="laser" selected>Laser pointer</option>
-      <option value="flashlight">Flashlight</option>
-    </select>
-  </label>
-  <label>Beam origin
-    <select id="emitter">
-      <option value="bottom-center" selected>Bottom center</option>
-      <option value="bottom-left">Bottom left</option>
-      <option value="bottom-right">Bottom right</option>
-      <option value="top-left">Top left</option>
-      <option value="top-right">Top right</option>
-    </select>
-  </label>
-  <label>Sensitivity
-    <input type="range" id="sensitivity" min="5" max="60" value="38">
-  </label>
-  <label>Beam width
-    <input type="range" id="divergence" min="0" max="100" value="12">
-  </label>
-  <label>Min size
-    <input type="range" id="minSize" min="1" max="30" value="2">
-  </label>
-  <label>Max size
-    <input type="range" id="maxSize" min="50" max="3000" value="500" step="10">
-  </label>
-  <button id="demoBtn" type="button">Demo bug</button>
-  <button id="debugBtn" type="button">Debug view</button>
-  <button id="resetBtn" type="button">Reset background</button>
-</div>
+<div id="warning" class="warning" role="status" hidden></div>
 
 <main>
-  <div class="stage">
-    <video id="video" playsinline muted></video>
-    <canvas id="overlay"></canvas>
-    <canvas id="debug"></canvas>
+  <div class="stage-wrap">
+    <div class="stage">
+      <video id="video" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <canvas id="debug"></canvas>
+    </div>
   </div>
+
+  <button id="controlsToggle" class="controls-toggle" type="button" aria-controls="controls" aria-expanded="false">
+    <span>Controls</span><span class="chev" aria-hidden="true">▾</span>
+  </button>
+
+  <div class="controls" id="controls">
+    <label>Camera
+      <select id="camera"></select>
+    </label>
+    <label>Beam style
+      <select id="beamStyle">
+        <option value="laser" selected>Laser pointer</option>
+        <option value="flashlight">Flashlight</option>
+      </select>
+    </label>
+    <label>Beam origin
+      <select id="emitter">
+        <option value="bottom-center" selected>Bottom center</option>
+        <option value="bottom-left">Bottom left</option>
+        <option value="bottom-right">Bottom right</option>
+        <option value="top-left">Top left</option>
+        <option value="top-right">Top right</option>
+      </select>
+    </label>
+    <label>Sensitivity
+      <input type="range" id="sensitivity" min="5" max="60" value="38">
+    </label>
+    <label>Beam width
+      <input type="range" id="divergence" min="0" max="100" value="12">
+    </label>
+    <label>Min size
+      <input type="range" id="minSize" min="1" max="30" value="2">
+    </label>
+    <label>Max size
+      <input type="range" id="maxSize" min="50" max="3000" value="500" step="10">
+    </label>
+    <div class="btn-row">
+      <button id="demoBtn" type="button">Demo bug</button>
+      <button id="debugBtn" type="button">Debug view</button>
+      <button id="resetBtn" type="button">Reset background</button>
+      <button id="clearTarget" type="button">Clear target</button>
+    </div>
+  </div>
+
   <p class="hint">
-    Click the video to set a manual target, double-click to clear it.
-    To test detection: toggle the demo bug, or wave a pen tip / toss a small paper ball in view.
+    Tap or click the video to set a manual target; use <b>Clear target</b> to release it
+    (on a computer you can also double-click to clear).
+    To test detection: toggle the <b>Demo bug</b>, or wave a pen tip / toss a small paper ball in view.
     People and other large moving objects are ignored; a snapshot is captured automatically
     when bug confidence exceeds 99%.
-    For the widest field of view, disable Center Stage in macOS Control Center while the camera is active.
+    On a Mac, disable Center Stage in Control Center for the widest field of view.
   </p>
 
   <section class="gallery" id="gallerySection" hidden>
     <h2>Detections <button id="clearShots" type="button">Clear</button></h2>
     <div id="gallery"></div>
   </section>
+
+  <footer class="disclaimer">
+    <strong>Just for fun.</strong> This is a toy simulator built for entertainment and learning.
+    It draws a <em>virtual</em> beam on your screen — it is not a real laser, a pest-control
+    product, or any kind of safety, medical, or scientific device. Don't rely on it for anything
+    that matters, and never point real lasers at people, animals, or eyes.
+  </footer>
 </main>
 
 <script src="app.js"></script>
