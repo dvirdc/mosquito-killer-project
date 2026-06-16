@@ -36,9 +36,11 @@ const ui = {
   gallerySection: document.getElementById('gallerySection'),
   gallery: document.getElementById('gallery'),
   clearShots: document.getElementById('clearShots'),
+  cameraBtn: document.getElementById('cameraBtn'),
   warning: document.getElementById('warning'),
   controls: document.getElementById('controls'),
   controlsToggle: document.getElementById('controlsToggle'),
+  dock: document.getElementById('dock'),
   clearTarget: document.getElementById('clearTarget'),
 };
 
@@ -83,6 +85,10 @@ const track = {
 };
 
 const demo = { on: false, x: 80, y: 60, vx: 25, vy: 12, t: 0 };
+
+// Self-contained "simulated room" shown on load (no camera). A bug flies around a
+// drawn room while the virtual laser tracks it — a preview of what the tool does.
+const sim = { active: true, x: 0, y: 0, vx: 60, vy: 30, t: 0, tx: 0, ty: 0, started: false };
 
 const isTouch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -623,6 +629,146 @@ function render(now) {
     : '';
 }
 
+// ---------- simulated room (demo on load) ----------
+
+// A simple drawn room: wall, floor, window with a moon, a framed picture and a
+// lamp. Purely decorative — gives the flying bug + laser something to fly over.
+function drawRoom(W, H) {
+  const floorY = H * 0.68;
+
+  const wall = octx.createLinearGradient(0, 0, 0, floorY);
+  wall.addColorStop(0, '#202a3a');
+  wall.addColorStop(1, '#192232');
+  octx.fillStyle = wall;
+  octx.fillRect(0, 0, W, floorY);
+
+  const floor = octx.createLinearGradient(0, floorY, 0, H);
+  floor.addColorStop(0, '#33271a');
+  floor.addColorStop(1, '#211810');
+  octx.fillStyle = floor;
+  octx.fillRect(0, floorY, W, H - floorY);
+
+  octx.fillStyle = 'rgba(0,0,0,0.25)';
+  octx.fillRect(0, floorY - 4, W, 5); // baseboard shadow
+
+  // window with night sky + moon
+  const wx = W * 0.1, wy = H * 0.16, ww = W * 0.26, wh = H * 0.34;
+  const sky = octx.createLinearGradient(0, wy, 0, wy + wh);
+  sky.addColorStop(0, '#0d1830');
+  sky.addColorStop(1, '#16233f');
+  octx.fillStyle = sky;
+  octx.fillRect(wx, wy, ww, wh);
+  octx.fillStyle = 'rgba(245,240,210,0.9)';
+  octx.beginPath();
+  octx.arc(wx + ww * 0.72, wy + wh * 0.3, Math.min(ww, wh) * 0.16, 0, Math.PI * 2);
+  octx.fill();
+  octx.strokeStyle = '#2c3850';
+  octx.lineWidth = Math.max(3, W * 0.005);
+  octx.strokeRect(wx, wy, ww, wh);
+  octx.beginPath();
+  octx.moveTo(wx + ww / 2, wy); octx.lineTo(wx + ww / 2, wy + wh);
+  octx.moveTo(wx, wy + wh / 2); octx.lineTo(wx + ww, wy + wh / 2);
+  octx.stroke();
+
+  // framed picture on the right
+  const px = W * 0.66, py = H * 0.2, pw = W * 0.2, ph = H * 0.26;
+  octx.fillStyle = '#11161f';
+  octx.fillRect(px, py, pw, ph);
+  octx.strokeStyle = '#3a455a'; // matches --border-hi
+  octx.lineWidth = Math.max(3, W * 0.006);
+  octx.strokeRect(px, py, pw, ph);
+  octx.fillStyle = 'rgba(61,255,122,0.18)';
+  octx.beginPath();
+  octx.moveTo(px + pw * 0.5, py + ph * 0.28);
+  octx.lineTo(px + pw * 0.78, py + ph * 0.72);
+  octx.lineTo(px + pw * 0.22, py + ph * 0.72);
+  octx.closePath();
+  octx.fill();
+
+  // floor lamp, bottom-right
+  const lx = W * 0.86;
+  octx.strokeStyle = '#2c3548';
+  octx.lineWidth = Math.max(3, W * 0.006);
+  octx.beginPath();
+  octx.moveTo(lx, floorY); octx.lineTo(lx, H * 0.46);
+  octx.stroke();
+  const glow = octx.createRadialGradient(lx, H * 0.42, 2, lx, H * 0.42, W * 0.09);
+  glow.addColorStop(0, 'rgba(255,224,160,0.55)');
+  glow.addColorStop(1, 'rgba(255,224,160,0)');
+  octx.fillStyle = glow;
+  octx.beginPath();
+  octx.arc(lx, H * 0.42, W * 0.09, 0, Math.PI * 2);
+  octx.fill();
+  octx.fillStyle = '#d9b877';
+  octx.beginPath();
+  octx.moveTo(lx - W * 0.035, H * 0.46);
+  octx.lineTo(lx + W * 0.035, H * 0.46);
+  octx.lineTo(lx + W * 0.022, H * 0.4);
+  octx.lineTo(lx - W * 0.022, H * 0.4);
+  octx.closePath();
+  octx.fill();
+}
+
+function drawSimBug(x, y, ang) {
+  octx.save();
+  octx.translate(x, y);
+  octx.rotate(ang);
+  // wings
+  octx.fillStyle = 'rgba(180,210,255,0.35)';
+  octx.beginPath(); octx.ellipse(-2, -5, 6, 3, -0.5, 0, Math.PI * 2); octx.fill();
+  octx.beginPath(); octx.ellipse(-2, 5, 6, 3, 0.5, 0, Math.PI * 2); octx.fill();
+  // body
+  octx.fillStyle = '#0e0e12';
+  octx.beginPath(); octx.ellipse(0, 0, 6, 2.6, 0, 0, Math.PI * 2); octx.fill();
+  // legs
+  octx.strokeStyle = 'rgba(20,20,24,0.8)';
+  octx.lineWidth = 1;
+  octx.beginPath();
+  octx.moveTo(-1, 1); octx.lineTo(-6, 6);
+  octx.moveTo(1, 1); octx.lineTo(6, 6);
+  octx.moveTo(0, 1); octx.lineTo(0, 7);
+  octx.stroke();
+  octx.restore();
+}
+
+function renderSim(now, dt) {
+  fitOverlay();
+  const W = overlay.width, H = overlay.height;
+  if (!W || !H) return;
+
+  if (!sim.started) { sim.x = W * 0.5; sim.y = H * 0.4; sim.tx = sim.x; sim.ty = sim.y; sim.started = true; }
+
+  // erratic, mosquito-like flight bounded to the room
+  sim.t += dt;
+  sim.vx += (Math.random() - 0.5) * 420 * dt;
+  sim.vy += (Math.random() - 0.5) * 420 * dt;
+  const sp = Math.hypot(sim.vx, sim.vy);
+  const maxSp = Math.min(W, H) * 0.6, minSp = Math.min(W, H) * 0.15;
+  if (sp > maxSp) { sim.vx *= maxSp / sp; sim.vy *= maxSp / sp; }
+  else if (sp > 0 && sp < minSp) { sim.vx *= minSp / sp; sim.vy *= minSp / sp; }
+  sim.x += sim.vx * dt + Math.sin(sim.t * 9) * 0.8;
+  sim.y += sim.vy * dt + Math.cos(sim.t * 7) * 0.8;
+  const m = Math.max(20, W * 0.05);
+  if (sim.x < m) { sim.x = m; sim.vx = Math.abs(sim.vx); }
+  if (sim.x > W - m) { sim.x = W - m; sim.vx = -Math.abs(sim.vx); }
+  if (sim.y < m) { sim.y = m; sim.vy = Math.abs(sim.vy); }
+  if (sim.y > H - m) { sim.y = H - m; sim.vy = -Math.abs(sim.vy); }
+
+  // the laser lags slightly toward the bug, like a real tracker catching up
+  sim.tx += 0.16 * (sim.x - sim.tx);
+  sim.ty += 0.16 * (sim.y - sim.ty);
+
+  octx.clearRect(0, 0, W, H);
+  drawRoom(W, H);
+  drawSimBug(sim.x, sim.y, Math.atan2(sim.vy, sim.vx));
+  drawBeam({ x: sim.tx, y: sim.ty }, now);
+
+  ui.status.textContent = 'demo';
+  ui.status.className = 'status locked';
+  ui.conf.textContent = 'simulated room';
+  ui.resInfo.textContent = '';
+}
+
 // ---------- main loop ----------
 
 let lastT = performance.now();
@@ -635,6 +781,8 @@ function tick(now) {
   if (video.readyState >= 2 && video.videoWidth) {
     processFrame(dt, now);
     render(now);
+  } else if (sim.active) {
+    renderSim(now, dt);
   }
   if (dt > 0) fpsEma = fpsEma ? fpsEma * 0.92 + (1 / dt) * 0.08 : 1 / dt;
   ui.fps.textContent = `${fpsEma.toFixed(0)} fps`;
@@ -672,9 +820,15 @@ overlay.addEventListener('touchstart', (e) => {
 ui.clearTarget.addEventListener('click', () => { manual = null; });
 
 ui.controlsToggle.addEventListener('click', () => {
-  const open = ui.controls.classList.toggle('open');
-  ui.controlsToggle.setAttribute('aria-expanded', String(open));
+  const collapsed = ui.dock.classList.toggle('collapsed');
+  ui.controlsToggle.setAttribute('aria-expanded', String(!collapsed));
 });
+
+// Start collapsed on small screens so the docked bar doesn't eat the viewport.
+if (matchMedia('(max-width: 760px)').matches) {
+  ui.dock.classList.add('collapsed');
+  ui.controlsToggle.setAttribute('aria-expanded', 'false');
+}
 
 ui.camera.addEventListener('change', () => startCamera(ui.camera.value).catch(showError));
 
@@ -702,12 +856,20 @@ ui.clearShots.addEventListener('click', () => {
   ui.gallerySection.hidden = true;
 });
 
-video.addEventListener('playing', startLoop);
+video.addEventListener('playing', () => {
+  sim.active = false; // real frames flowing — leave the simulated room
+  startLoop();
+});
 
 function showError(err) {
   console.error(err);
   ui.status.textContent = `camera error: ${err.name || err.message}`;
   ui.status.className = 'status coast';
+  // fall back to the simulated demo so the page is never blank
+  sim.active = true;
+  ui.cameraBtn.disabled = false;
+  ui.cameraBtn.classList.remove('live');
+  ui.cameraBtn.textContent = '📷 Use my camera';
 }
 
 let loopRunning = false;
@@ -718,14 +880,22 @@ function startLoop() {
 }
 
 async function boot(deviceId) {
+  ui.cameraBtn.disabled = true;
+  ui.cameraBtn.textContent = 'Starting camera…';
   ui.status.textContent = 'starting…';
   ui.status.className = 'status search';
   try {
     await startCamera(deviceId);
+    sim.active = false;
+    ui.cameraBtn.textContent = '📷 Camera on';
+    ui.cameraBtn.classList.add('live');
+    ui.cameraBtn.disabled = false;
   } catch (err) {
     showError(err);
   }
 }
 
-boot();
-startLoop(); // render loop runs regardless; it self-gates on video readiness
+ui.cameraBtn.addEventListener('click', () => boot(ui.camera.value || undefined));
+
+// Start in the simulated-room demo; the user opts into their camera with the button.
+startLoop();

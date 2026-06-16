@@ -20,11 +20,12 @@
     </div>
   </div>
   <div class="hud">
-    <span id="status" class="status search">starting…</span>
+    <span id="status" class="status search">demo</span>
     <span id="conf" class="pill"></span>
     <span id="fps" class="pill"></span>
     <span id="resInfo" class="pill"></span>
   </div>
+  <button id="cameraBtn" class="cam-btn" type="button">📷 Use my camera</button>
 </header>
 
 <div id="warning" class="warning" role="status" hidden></div>
@@ -38,11 +39,12 @@
     </div>
   </div>
 
-  <button id="controlsToggle" class="controls-toggle" type="button" aria-controls="controls" aria-expanded="false">
-    <span>Controls</span><span class="chev" aria-hidden="true">▾</span>
-  </button>
+  <div class="dock" id="dock">
+    <button id="controlsToggle" class="controls-toggle" type="button" aria-controls="controls" aria-expanded="true">
+      <span>Controls</span><span class="chev" aria-hidden="true">▾</span>
+    </button>
 
-  <div class="controls" id="controls">
+    <div class="controls" id="controls">
     <label>Camera
       <select id="camera"></select>
     </label>
@@ -78,6 +80,7 @@
       <button id="debugBtn" type="button">Debug view</button>
       <button id="resetBtn" type="button">Reset background</button>
       <button id="clearTarget" type="button">Clear target</button>
+    </div>
     </div>
   </div>
 

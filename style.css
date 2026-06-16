@@ -124,6 +124,30 @@ h1 {
   background: currentColor;
   box-shadow: 0 0 8px currentColor;
 }
+.cam-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  background: rgba(61, 255, 122, 0.14);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+.cam-btn:hover { background: rgba(61, 255, 122, 0.22); }
+.cam-btn:active { transform: scale(0.97); }
+.cam-btn:disabled { opacity: 0.55; cursor: default; }
+.cam-btn.live {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--text-dim);
+}
+
 .status.locked { color: var(--accent); border-color: rgba(61, 255, 122, 0.4); background: rgba(61, 255, 122, 0.1); }
 .status.coast  { color: var(--amber);  border-color: rgba(255, 184, 77, 0.4);  background: rgba(255, 184, 77, 0.1); }
 .status.search { color: var(--text-dim); }
@@ -147,8 +171,9 @@ h1 {
 main {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 16px max(16px, env(safe-area-inset-left))
-           calc(24px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-right));
+  /* extra bottom padding clears the fixed controls dock */
+  padding: 16px max(16px, env(safe-area-inset-right))
+           calc(80px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 
 .stage-wrap { margin-bottom: 14px; }
@@ -193,19 +218,34 @@ main {
   box-shadow: var(--shadow);
 }
 
-/* ---------- controls ---------- */
+/* ---------- docked controls bar ---------- */
+
+/* Pinned to the bottom of the viewport so it never scrolls away. The toggle is
+   the always-visible handle; collapsing hides the controls but keeps the bar. */
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  background: linear-gradient(180deg, rgba(22, 26, 33, 0.97), rgba(17, 20, 26, 0.99));
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
 .controls-toggle {
-  display: none;
+  display: flex;
   width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 12px;
-  padding: 11px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  padding: 12px max(16px, env(safe-area-inset-left));
+  border: 0;
+  background: transparent;
   color: var(--text);
   font-size: 14px;
   font-weight: 600;
@@ -219,12 +259,13 @@ main {
   flex-wrap: wrap;
   gap: 12px 18px;
   align-items: center;
-  margin-bottom: 14px;
-  padding: 14px 16px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--border);
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 max(16px, env(safe-area-inset-left)) 14px;
+  max-height: 46vh;
+  overflow-y: auto;
 }
+.dock.collapsed .controls { display: none; }
 
 .controls label {
   display: flex;
@@ -349,24 +390,19 @@ main {
   .hud { width: 100%; }
   .tagline { display: none; }
 
-  .controls-toggle { display: flex; }
-  .controls { display: none; }
-  .controls.open { display: flex; flex-direction: column; align-items: stretch; }
-  .controls.open label { justify-content: space-between; }
-  .controls.open select { max-width: none; flex: 1; margin-left: 12px; }
+  .controls { flex-direction: column; align-items: stretch; }
+  .controls label { justify-content: space-between; }
+  .controls select { max-width: none; flex: 1; margin-left: 12px; }
   .controls input[type="range"] { width: 100%; flex: 1; margin-left: 12px; }
   .btn-row { display: grid; grid-template-columns: 1fr 1fr; }
   .controls button { padding: 11px 12px; }
 
-  .stage { aspect-ratio: auto; }
-  #video { height: auto; }
-  #overlay { height: 100%; }
+  .cam-btn { width: 100%; justify-content: center; }
 }
 
-/* portrait phones: let the camera fill more height */
+/* portrait phones: a taller stage so the simulated room / camera fills more height */
 @media (max-width: 760px) and (orientation: portrait) {
   .stage { aspect-ratio: 3 / 4; }
-  #video { height: 100%; }
 }
 
 @media (hover: none) {
