@@ -3,21 +3,23 @@
 Computer-vision mosquito pointer: detect a mosquito with a camera and point a
 beam at it so a human can find and swat it.
 
-## Web simulator (`simulator/`)
+## Web simulator (PewPewBug)
 
-Browser-based simulator that runs the real detection pipeline on your MacBook
+Browser-based simulator that runs the real detection pipeline on your device
 camera and renders a **virtual** laser/flashlight beam on screen — beam
 direction and width are drawn as if an emitter at the chosen screen corner were
-pointing at the target.
+pointing at the target. The UI is responsive and works on phones and tablets
+(iPhone/iPad) as well as desktop.
 
 ### Run
 
 ```sh
 python3 -m http.server 8788
-# then open http://localhost:8788/simulator/
+# then open http://localhost:8788/
 ```
 
-(Any static server works; `getUserMedia` needs localhost or https.)
+(Any static server works; `getUserMedia` needs localhost or https. The site is
+served from the repo root so it deploys directly to GitHub Pages.)
 
 ### How it works
 
